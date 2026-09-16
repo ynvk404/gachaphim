@@ -334,6 +334,16 @@ export default function Home() {
     setPageInput('1');
   };
 
+  const changeCombinedFilter = (value: string) => {
+    if (value === 'single' || value === 'series') {
+      setGenre('');
+      changeMovieKind(value);
+      return;
+    }
+    setMovieKind('');
+    changeGenre(value);
+  };
+
   const goToPage = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const requested = Number.parseInt(pageInput, 10);
@@ -357,9 +367,17 @@ export default function Home() {
     try {
       const res = await fetch(`https://phim.nguonc.com/api/film/${slug}`);
       const data = await res.json();
-      const items = Array.isArray(data?.movie?.episodes)
+      const rawItems: Episode[] = Array.isArray(data?.movie?.episodes)
         ? data.movie.episodes.flatMap((group: EpisodeGroup) => group.items || [])
         : [];
+      const seenEpisodes = new Set<string>();
+      const items = rawItems.filter((episode, index) => {
+        const key = episode.name?.trim().toLowerCase() ||
+          episode.link_m3u8 || episode.embed || `episode-${index}`;
+        if (seenEpisodes.has(key)) return false;
+        seenEpisodes.add(key);
+        return true;
+      });
       if (data.status === 'success' && items.length > 0) {
         playEpisode(items, 0);
       } else {
@@ -611,21 +629,20 @@ export default function Home() {
           </form>
           <label className="genre-control">
             <span>{t.genreFilter}</span>
-            <select value={genre} onChange={(event) => changeGenre(event.target.value)}>
+            <select
+              value={movieKind || genre}
+              onChange={(event) => changeCombinedFilter(event.target.value)}
+            >
               <option value="">{t.allGenres}</option>
               {genreOptions.map(([slug, vi, en]) => (
                 <option key={slug} value={slug}>
                   {language === 'vi' ? vi : en}
                 </option>
               ))}
-            </select>
-          </label>
-          <label className="genre-control">
-            <span>{t.movieTypeFilter}</span>
-            <select value={movieKind} onChange={(event) => changeMovieKind(event.target.value)}>
-              <option value="">{t.allMovieTypes}</option>
-              <option value="single">{t.singleMovie}</option>
-              <option value="series">{t.seriesMovie}</option>
+              <optgroup label={t.movieTypeFilter}>
+                <option value="single">{t.singleMovie}</option>
+                <option value="series">{t.seriesMovie}</option>
+              </optgroup>
             </select>
           </label>
         </section>
