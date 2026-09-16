@@ -8,14 +8,15 @@ import {
 
 const root = '/movie-cache';
 const moviesPerPage = 12;
-const remoteList = (page: number, query: string, genre: string) => {
+const remoteList = (page: number, query: string, genre: string, kind: string) => {
+  const typeQuery = kind ? `&type=${kind}` : '';
   if (query) {
-    return `https://phim.nguonc.com/api/films/search?keyword=${encodeURIComponent(query)}&page=${page}`;
+    return `https://phim.nguonc.com/api/films/search?keyword=${encodeURIComponent(query)}&page=${page}${typeQuery}`;
   }
   if (genre) {
-    return `https://phim.nguonc.com/api/films/the-loai/${genre}?page=${page}`;
+    return `https://phim.nguonc.com/api/films/the-loai/${genre}?page=${page}${typeQuery}`;
   }
-  return `https://phim.nguonc.com/api/films/quoc-gia/han-quoc?page=${page}`;
+  return `https://phim.nguonc.com/api/films/quoc-gia/han-quoc?page=${page}${typeQuery}`;
 };
 
 // Giả lập trạng thái 'idle' (đứng im) vì ta không cần crawl ngầm nữa
@@ -26,7 +27,7 @@ const idle: RefreshStatus = {
   message: 'Kho phim đã sẵn sàng',
 };
 
-export function useMovieSnapshot(page: number, query = '', genre = '') {
+export function useMovieSnapshot(page: number, query = '', genre = '', kind = '') {
   // Đổi type từ ActressSnapshot sang MovieSnapshot
   const [snapshot, setSnapshot] = useState<MovieSnapshot | null>(null);
   const [status, setStatus] = useState<RefreshStatus>(idle);
@@ -51,7 +52,7 @@ export function useMovieSnapshot(page: number, query = '', genre = '') {
         } else {
           const firstApiPage = Math.floor(((page - 1) * moviesPerPage) / 10) + 1;
           const firstResponse = await fetch(
-            remoteList(firstApiPage, query, genre),
+            remoteList(firstApiPage, query, genre, kind),
             { cache: 'no-store' },
           );
           if (!firstResponse.ok) throw new Error('Không tìm thấy dữ liệu phim');
@@ -69,7 +70,7 @@ export function useMovieSnapshot(page: number, query = '', genre = '') {
           let apiPage = firstApiPage + 1;
 
           while (items.length < moviesPerPage && items.length + pageOffset < totalItems) {
-            const nextResponse = await fetch(remoteList(apiPage, query, genre), {
+            const nextResponse = await fetch(remoteList(apiPage, query, genre, kind), {
               cache: 'no-store',
             });
             if (!nextResponse.ok) break;
@@ -107,7 +108,7 @@ export function useMovieSnapshot(page: number, query = '', genre = '') {
     return () => {
       live = false;
     };
-  }, [page, query, genre]);
+  }, [page, query, genre, kind]);
 
   return { snapshot, status, error };
 }

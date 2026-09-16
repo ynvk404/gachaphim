@@ -61,6 +61,18 @@ type MovieDetail = Movie & {
   language?: string;
   director?: string;
   casts?: string;
+  episodes?: EpisodeGroup[];
+};
+
+type Episode = {
+  name?: string;
+  embed?: string;
+  link_m3u8?: string;
+};
+
+type EpisodeGroup = {
+  server_name?: string;
+  items?: Episode[];
 };
 
 function plainDescription(value: string | undefined) {
@@ -141,7 +153,8 @@ export default function Home() {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [genre, setGenre] = useState('');
-  const { snapshot, status, error } = useMovieSnapshot(page, searchQuery, genre);
+  const [movieKind, setMovieKind] = useState('');
+  const { snapshot, status, error } = useMovieSnapshot(page, searchQuery, genre, movieKind);
   const preferences = usePreferences();
   const { count: localSpins, recordSpin } = useLocalSpinCount();
   const [language, setLanguage] = useState<Language>('vi');
@@ -161,6 +174,8 @@ export default function Home() {
 
   // Trạng thái phát video
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [currentEpisode, setCurrentEpisode] = useState(0);
 
   const [active, setActive] = useState<Movie[]>([]);
   const [reel, setReel] = useState<{ movie: Movie; id: number }[]>([]);
@@ -235,8 +250,8 @@ export default function Home() {
   }, [snapshot]);
 
   const eligible = useMemo(
-    () => filterMovies(active),
-    [active] // Preferences đã tối giản, chỉ filter active list
+    () => filterMovies(active).filter((movie) => !movieKind || movie.kind === movieKind),
+    [active, movieKind] // Preferences đã tối giản, chỉ filter active list
   );
 
   useEffect(() => {
@@ -313,6 +328,12 @@ export default function Home() {
     setPageInput('1');
   };
 
+  const changeMovieKind = (value: string) => {
+    setMovieKind(value);
+    setPage(1);
+    setPageInput('1');
+  };
+
   const goToPage = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const requested = Number.parseInt(pageInput, 10);
@@ -323,14 +344,24 @@ export default function Home() {
   };
 
   // Hàm gọi API NguonC lấy link xem phim khi click nút
+  const playEpisode = (items: Episode[], index: number) => {
+    const episode = items[index];
+    const source = episode?.link_m3u8 || episode?.embed;
+    if (!source) return;
+    setEpisodes(items);
+    setCurrentEpisode(index);
+    setPlayingVideo(source);
+  };
+
   const handleWatchMovie = async (slug: string) => {
     try {
       const res = await fetch(`https://phim.nguonc.com/api/film/${slug}`);
       const data = await res.json();
-      if (data.status === 'success' && data.movie.episodes.length > 0) {
-        // Lấy link embed của tập đầu tiên
-        const embedLink = data.movie.episodes[0].items[0].embed;
-        setPlayingVideo(embedLink);
+      const items = Array.isArray(data?.movie?.episodes)
+        ? data.movie.episodes.flatMap((group: EpisodeGroup) => group.items || [])
+        : [];
+      if (data.status === 'success' && items.length > 0) {
+        playEpisode(items, 0);
       } else {
         alert(t.watchUnavailable);
       }
@@ -589,6 +620,14 @@ export default function Home() {
               ))}
             </select>
           </label>
+          <label className="genre-control">
+            <span>{t.movieTypeFilter}</span>
+            <select value={movieKind} onChange={(event) => changeMovieKind(event.target.value)}>
+              <option value="">{t.allMovieTypes}</option>
+              <option value="single">{t.singleMovie}</option>
+              <option value="series">{t.seriesMovie}</option>
+            </select>
+          </label>
         </section>
 
         <div className="cs-case-heading">
@@ -751,15 +790,47 @@ export default function Home() {
         {/* Modal Phát Video */}
         <Dialog open={!!playingVideo} onOpenChange={() => setPlayingVideo(null)}>
           <DialogContent className="watch-dialog" showCloseButton>
+            {episodes.length > 0 && (
+              <div className="episode-picker">
+                <strong>{t.episodes}</strong>
+                <div className="episode-list">
+                  {episodes.map((episode, index) => (
+                    <button
+                      key={`${episode.name || t.episode}-${index}`}
+                      className={index === currentEpisode ? 'episode-button active' : 'episode-button'}
+                      onClick={() => playEpisode(episodes, index)}
+                    >
+                      {episode.name || `${t.episode} ${index + 1}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {playingVideo && (
-              <iframe
-                src={playingVideo}
-                width="100%"
-                height="500px"
-                frameBorder="0"
-                allowFullScreen
-                style={{ display: 'block' }}
-              />
+              playingVideo.includes('.m3u8') || playingVideo.endsWith('.mp4') ? (
+                <video
+                  key={playingVideo}
+                  src={playingVideo}
+                  controls
+                  autoPlay
+                  onEnded={() => {
+                    if (currentEpisode < episodes.length - 1) {
+                      playEpisode(episodes, currentEpisode + 1);
+                    }
+                  }}
+                  style={{ display: 'block', width: '100%', maxHeight: '500px' }}
+                />
+              ) : (
+                <iframe
+                  key={playingVideo}
+                  src={playingVideo}
+                  width="100%"
+                  height="500px"
+                  frameBorder="0"
+                  allowFullScreen
+                  style={{ display: 'block' }}
+                />
+              )
             )}
           </DialogContent>
         </Dialog>

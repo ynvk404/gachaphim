@@ -12,6 +12,7 @@ export type Movie = {
   year: number;
   quality: string;
   tier: Tier; // Gacha UI cần thuộc tính này để xác định độ hiếm
+  kind: 'single' | 'series';
 };
 
 export type MovieSnapshot = {
@@ -78,6 +79,16 @@ export function validateSnapshot(input: unknown): MovieSnapshot | null {
     const name = safeText(row.name, 200);
     if (!slug || !name || ids.has(slug)) continue;
 
+    const rawType = safeText(row.type, 30)?.toLowerCase();
+    const episodeTotal =
+      typeof row.episode_total === 'number'
+        ? row.episode_total
+        : Number.parseInt(String(row.episode_total ?? ''), 10);
+    const kind: Movie['kind'] =
+      rawType === 'series' || rawType === 'tv_series' || episodeTotal > 1
+        ? 'series'
+        : 'single';
+
     // Phân loại Tier ngẫu nhiên hoặc dựa trên năm/chất lượng để gacha có độ hiếm
     // Ở đây tạm thời random Tier từ 0-4
     const randomTier = Math.floor(Math.random() * TIER_COUNT) as Tier;
@@ -97,6 +108,7 @@ export function validateSnapshot(input: unknown): MovieSnapshot | null {
             : new Date().getFullYear(),
       quality: safeText(row.quality, 50) || 'HD',
       tier: randomTier,
+      kind,
     });
   }
 

@@ -702,6 +702,36 @@ main {
   font-weight: 700;
 }
 
+.episode-picker {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #d6e0e4;
+}
+
+.episode-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.episode-button {
+  border: 1px solid #617780;
+  border-radius: 3px;
+  background: #17262d;
+  color: #f4f8fa;
+  cursor: pointer;
+  padding: 6px 9px;
+}
+
+.episode-button.active,
+.episode-button:hover {
+  border-color: #d4a34f;
+  background: #bd842e;
+}
+
 .section-heading {
   display: flex;
   justify-content: space-between;
